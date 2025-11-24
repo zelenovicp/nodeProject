@@ -28,12 +28,13 @@ router.post('/', async (req, res) => {
         res.status(400).send("Username can not be empty!");
     }
 
+    const trimmedUsername = username.trim();
     try {
         const db = await getDb();
-        const result = await db.run('INSERT INTO users (username) VALUES (?)', [username]);
+        const result = await db.run('INSERT INTO users (username) VALUES (?)', [trimmedUsername]);
 
         res.send({
-            username: username,
+            username: trimmedUsername,
             id: result.lastID
         });
     } catch (err) {
@@ -52,7 +53,13 @@ router.post('/:_id/exercises', async (req, res) => {
 
     // if anything misses we return 400
     if (!description) return res.status(400).json({ error: 'Description is required' });
-    if (!duration) return res.status(400).json({ error: 'Duration is required' });
+    if (!duration && duration !== 0) {
+        return res.status(400).json({ error: 'Duration is required' });
+    }
+    const durationVal = Number(duration);
+    if (isNaN(durationVal) || durationVal <= 0) {
+        return res.status(400).json({ error: 'Duration needs to be a positive number' });
+    }
 
 
     // checking the date, providing default value
@@ -120,13 +127,14 @@ router.get('/:_id/logs', async (req, res) => {
 
         query += ` ORDER BY date ASC`;
 
+        if (limit) {
+            query += ` LIMIT ?`;
+            params.push(limit);
+        }
+
         let logs = await db.all(query, params);
 
         const count = logs.length;
-
-        if (limit) {
-            logs = logs.slice(0, parseInt(limit));
-        }
 
         res.json({
             id: user.id,
